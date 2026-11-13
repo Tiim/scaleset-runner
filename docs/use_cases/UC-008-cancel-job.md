@@ -23,7 +23,7 @@
 3. System notices that the Scale Set has more Runner Containers than assigned Jobs.
 4. System picks an Idle Runner Container of the Scale Set and deletes its Runner Registration on GitHub.
 5. GitHub confirms the deletion, and System removes the Runner Container.
-6. System frees the Slot and updates the Capacity it advertises for every Scale Set.
+6. System frees the Slot.
 7. Workflow Author sees the Job cancelled in the workflow run.
 
 ## Alternative Flows
@@ -84,7 +84,7 @@
 ### Success Postconditions
 
 - No Runner Container or Runner Registration of the cancelled Job remains.
-- The Slot is free again and every Scale Set advertises its updated Capacity.
+- The Slot is free again.
 
 ### Failure Postconditions
 

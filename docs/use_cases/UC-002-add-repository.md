@@ -25,7 +25,7 @@
 3. Operator redeploys the Controller (UC-001 Deploy Controller).
 4. System validates the Config, including the new entry.
 5. System creates the Scale Set for the repository under its configured name with its Instance label and records it in the State Store.
-6. System polls the new Scale Set alongside the existing ones and advertises its Capacity from the shared free Slots.
+6. System polls the new Scale Set alongside the existing ones and advertises the Slot limit as its Capacity.
 7. Operator sees the new Scale Set in the repository's runner settings and the Controller reported healthy; Workflow Authors can target it by its name.
 
 ## Alternative Flows

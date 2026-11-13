@@ -37,8 +37,8 @@ func TestSharedSlotServesJobsInOrder(t *testing.T) {
 		defer h.ctl.mu.Unlock()
 		return h.ctl.sets[1].queued == 1
 	})
-	// Capacity: own Runner Containers plus free Slots (none free).
-	eventually(t, "capacities", func() bool { return a.lastCapacity() == 1 && b.lastCapacity() == 0 })
+	// Capacity: always the Slot limit, even with no Slot free.
+	eventually(t, "capacities", func() bool { return a.lastCapacity() == 1 && b.lastCapacity() == 1 })
 
 	remaining := map[string]int{"tim/a": 2, "tim/b": 1}
 	for i := 0; i < 3; i++ {
@@ -92,6 +92,52 @@ func TestSharedSlotServesJobsInOrder(t *testing.T) {
 	}
 }
 
+// FR-009: a Scale Set keeps advertising the Slot limit while its only Slot is
+// held by a Runner Container whose Job just completed, so GitHub assigns a Job
+// queued in that window; it starts once the Slot frees up.
+func TestCapacityStaysAtSlotLimitWhileSlotBusy(t *testing.T) {
+	h := newHarness(t, testConfig(1), nil)
+	h.start()
+	a := h.gh.session(t, "tim/a")
+	eventually(t, "healthy", h.healthy)
+
+	a.push(msgStats(1, 1))
+	eventually(t, "runner", func() bool { return len(h.docker.liveRunners()) == 1 })
+	first := h.docker.liveRunners()[0]
+	a.push(msgStarted(first, "job-1"))
+	a.push(msgCompleted(first, "job-1", 0))
+	eventually(t, "job completed", func() bool {
+		h.ctl.mu.Lock()
+		defer h.ctl.mu.Unlock()
+		r := h.ctl.sets[0].runners[first]
+		return r != nil && r.completed
+	})
+	a.mu.Lock()
+	from := len(a.capacities)
+	a.mu.Unlock()
+	eventually(t, "more polls", func() bool {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		return len(a.capacities) >= from+3
+	})
+	a.mu.Lock()
+	caps := slices.Clone(a.capacities[from:])
+	a.mu.Unlock()
+	for _, c := range caps {
+		if c != 1 {
+			t.Fatalf("capacity %d advertised while the slot was busy, want 1 (all: %v)", c, caps)
+		}
+	}
+
+	// GitHub assigns the next Job before the first container has exited.
+	a.push(msgStats(1, 1))
+	h.docker.exitRunner(first, 0)
+	eventually(t, "second runner", func() bool {
+		l := h.docker.liveRunners()
+		return len(l) == 1 && l[0] != first
+	})
+}
+
 // UC-008, FR-028: a cancelled Job's Idle Runner Container is removed after
 // GitHub confirms the deletion of its registration.
 func TestCancelledJobRemovesIdleRunner(t *testing.T) {
@@ -111,7 +157,6 @@ func TestCancelledJobRemovesIdleRunner(t *testing.T) {
 	if !removed {
 		t.Fatal("registration not deleted")
 	}
-	eventually(t, "capacity back", func() bool { return a.lastCapacity() == 2 })
 }
 
 // UC-008 A3: GitHub refuses the deletion because the runner holds a Job; the

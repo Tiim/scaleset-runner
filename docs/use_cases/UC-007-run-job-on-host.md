@@ -23,14 +23,14 @@
 2. GitHub offers the Job to the Scale Set in the next poll.
 3. System acquires the Job, and GitHub raises the Scale Set's assigned Job count.
 4. System sees that the Scale Set's assigned Job count exceeds its Runner Containers and makes a start request.
-5. System takes a free Slot for the start request and updates the Capacity it advertises for every Scale Set.
+5. System takes a free Slot for the start request.
 6. System obtains a JIT Config for a new Runner Registration from GitHub.
 7. System starts a Runner Container from the repository's Runner Image with the JIT Config, its own entrypoint, and the configured CPU and memory limits, isolated from the Host.
 8. The Runner Container starts its own Docker daemon and then the runner, and writes the Ready marker once the runner has connected to GitHub.
 9. GitHub hands one of the Scale Set's assigned Jobs to the runner, and System learns the Job from the JobStarted message.
 10. The Job runs, including any image builds and compose stacks it needs, and restores and saves its Go and Docker caches through the GitHub Actions cache service as the README shows.
 11. The Job completes, the runner exits, and System receives the JobCompleted message.
-12. System deletes the Runner Registration, removes the Runner Container, frees the Slot, and updates the Capacity it advertises for every Scale Set.
+12. System deletes the Runner Registration, removes the Runner Container, and frees the Slot.
 13. Workflow Author sees the result of the Job in the workflow run.
 
 ## Alternative Flows
@@ -67,7 +67,7 @@
 **Trigger:** The Scale Set's assigned Job count no longer exceeds its Runner Containers while System retries the JIT Config or the start of the Runner Container, e.g. because the Job was cancelled (step 6 or 7)  
 **Flow:**
 
-1. System drops the start request, stops retrying, deletes the Runner Registration, if any, removes the Runner Container, if any, frees the Slot, and updates the Capacity it advertises.
+1. System drops the start request, stops retrying, deletes the Runner Registration, if any, removes the Runner Container, if any, and frees the Slot.
 2. System logs that the start request was dropped, naming the repository.
 3. Use case ends.
 
@@ -124,7 +124,7 @@
 **Flow:**
 
 1. System logs the failure and keeps the Runner Registration recorded in the State Store, so the next start deletes it.
-2. System still removes the Runner Container, frees the Slot, and updates the Capacity it advertises.
+2. System still removes the Runner Container and frees the Slot.
 3. Use case continues at step 13.
 
 ### A11: Runner Container Cannot Be Removed
@@ -134,7 +134,7 @@
 
 1. System logs the failure naming the repository and Runner Container.
 2. System keeps the Runner Container recorded in the State Store and retries the removal with growing delays; until it is removed, the Runner Container keeps its Slot.
-3. Once the removal succeeds, System frees the Slot and updates the Capacity it advertises for every Scale Set.
+3. Once the removal succeeds, System frees the Slot.
 4. Use case continues at step 13.
 
 ## Postconditions
@@ -143,7 +143,7 @@
 
 - The Job has concluded and its result is visible in the workflow run.
 - The Runner Container and its Runner Registration are removed.
-- The Slot is free again and every Scale Set advertises its updated Capacity.
+- The Slot is free again.
 - The logs trace the Job from the start of its Runner Container to its removal.
 
 ### Failure Postconditions
@@ -165,7 +165,7 @@ The number of running Runner Containers never exceeds the Controller's Slot limi
 
 ### BR-003: Capacity
 
-Every Scale Set advertises its own Runner Containers plus the free Slots as its Capacity. GitHub reads it with the next poll, so a poll already running may still lead to Jobs beyond the free Slots; their start requests wait (A2).
+Every Scale Set advertises the Slot limit as its Capacity, also while no Slot is free. GitHub decides whether to assign a Job when it is queued and does not offer it again when a Scale Set advertises more later, so a smaller Capacity could leave a Job queued on GitHub for good. Jobs beyond the free Slots are assigned, and their start requests wait (A2).
 
 ### BR-004: Start Request Order
 

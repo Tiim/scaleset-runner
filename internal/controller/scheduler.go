@@ -135,12 +135,13 @@ func (c *Controller) freeLocked() int {
 	return max(0, c.cfg.Slots-c.usedLocked())
 }
 
-// capacity is what a Scale Set advertises: its own Runner Containers plus
-// the free Slots (FR-009).
-func (c *Controller) capacity(ss *scaleSet) int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return ss.active() + c.freeLocked()
+// capacity is what a Scale Set advertises: always the Slot limit (FR-009).
+// GitHub decides whether to assign a Job when it is queued and does not offer
+// it again when a later poll advertises more, so advertising only the free
+// Slots strands Jobs queued while every Slot is taken. Jobs beyond the free
+// Slots wait in the start request queue instead (FR-010).
+func (c *Controller) capacity(*scaleSet) int {
+	return c.cfg.Slots
 }
 
 // ---- Demand ----

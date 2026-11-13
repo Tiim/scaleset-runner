@@ -27,7 +27,7 @@
 5. System removes every Runner Container carrying its Instance ID and deletes every Runner Registration recorded in its State Store, whether or not its Runner Container still exists, all of them left from a previous run.
 6. System deletes every Scale Set recorded in its State Store whose repository or name is no longer in the Config and removes its record, once no Runner Registration of that Scale Set is recorded any more.
 7. System takes over every Scale Set under a configured name that carries its Instance label but is missing from the State Store, creates a Scale Set with its Instance label under its configured name for every configured repository that has none, records both in the State Store, and updates every Scale Set it serves to the configured settings.
-8. System opens a message session for every Scale Set and advertises its Capacity: its own Runner Containers plus the free Slots.
+8. System opens a message session for every Scale Set and advertises its Capacity: the Slot limit.
 9. System reports healthy once every Scale Set has polled successfully.
 10. Operator sees the Controller reported healthy; it serves Jobs for every configured repository.
 
@@ -161,7 +161,7 @@
 - No Runner Container or Runner Registration from the Controller's previous run remains.
 - No Scale Set is recorded in the State Store for a repository or name that is no longer in the Config.
 - Every Scale Set carries the Controller's Instance label and the configured settings.
-- Every Scale Set advertises its own Runner Containers plus the free Slots as its Capacity.
+- Every Scale Set advertises the Slot limit as its Capacity.
 - The health status reports healthy.
 
 ### Failure Postconditions
@@ -207,7 +207,7 @@ Two running Controllers on one Host never share an Instance ID; the second one e
 
 ### BR-009: Capacity
 
-Every Scale Set advertises its own Runner Containers plus the free Slots as its Capacity (UC-007 BR-003).
+Every Scale Set advertises the Slot limit as its Capacity (UC-007 BR-003).
 
 ### BR-010: Registrations Before Scale Set
 

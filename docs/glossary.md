@@ -25,7 +25,7 @@
 | Refresh interval    | The number of days between two refreshes of the Runner Images; 7 by default, configurable.                                          |                            |
 | JIT Config          | The one-time runner configuration GitHub issues for one Runner Container; a secret until consumed.                                  | Registration token         |
 | Slot                | One unit of a Controller's limit on Runner Containers that may run at the same time across all its Scale Sets.                      |                            |
-| Capacity            | The largest number of Runner Containers the Controller tells GitHub a Scale Set may have at once: that Scale Set's own Runner Containers plus the free Slots. GitHub reads it with the next poll. | Max runners                |
+| Capacity            | The largest number of Runner Containers the Controller tells GitHub a Scale Set may have at once: always the Slot limit. GitHub reads it with every poll. | Max runners                |
 | Shutdown timeout    | The time running Jobs may take to finish after the Controller is asked to stop; 5 minutes by default, configurable.                  |                            |
 | Fork pull request   | A pull request whose head branch lives in a fork of the repository; its workflows run code the repository owner has not reviewed.    |                            |
 | Host                | The Docker host the Controller and its Runner Containers run on, initially orpheus.                                                  | Node                       |
