@@ -1,0 +1,36 @@
+# Example Docker Compose service for one Controller (C-004, FR-019).
+# Put the credentials in .env next to this file (never commit it).
+services:
+  scaleset-runner:
+    image: scaleset-runner:latest
+    build: ..
+    restart: unless-stopped
+    # Must exceed SCALESET_SHUTDOWN_TIMEOUT plus about 30 s for cleanup (C-004).
+    stop_grace_period: 6m
+    environment:
+      SCALESET_INSTANCE_ID: prod
+      SCALESET_NAME: orpheus
+      SCALESET_REPOSITORIES: >-
+        [
+          {"repository": "your-user/app"},
+          {"repository": "your-user/tooling", "name": "orpheus-big", "image": "ghcr.io/your-user/runner-tooling:latest"}
+        ]
+      SCALESET_SLOTS: "2"
+      SCALESET_RUNNER_CPUS: "2"
+      SCALESET_RUNNER_MEMORY: 4g
+      SCALESET_SHUTDOWN_TIMEOUT: 5m
+      # GitHub App (recommended) ...
+      SCALESET_GITHUB_APP_CLIENT_ID: ${SCALESET_GITHUB_APP_CLIENT_ID:-}
+      SCALESET_GITHUB_APP_INSTALLATION_ID: ${SCALESET_GITHUB_APP_INSTALLATION_ID:-}
+      SCALESET_GITHUB_APP_PRIVATE_KEY: ${SCALESET_GITHUB_APP_PRIVATE_KEY:-}
+      # ... or a personal access token, not both.
+      SCALESET_GITHUB_TOKEN: ${SCALESET_GITHUB_TOKEN:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - state:/var/lib/scaleset-runner
+    ports:
+      # Health and metrics reachable from the Host only (C-008).
+      - "127.0.0.1:9090:9090"
+
+volumes:
+  state:
