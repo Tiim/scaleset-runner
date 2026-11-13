@@ -79,8 +79,20 @@ Slot limits so that all Controllers together fit the Host.
 Self-hosted runners execute whatever code a workflow checks out. Before you add a **public**
 repository to the Config:
 
-1. In *Settings → Actions → General → Fork pull request workflows from outside collaborators*,
-   select **Require approval for all external contributors**.
+1. Require approval for fork pull request workflows from **all** external contributors. The
+   GitHub default only covers first-time contributors. In the repository's *Settings → Actions →
+   General*, under *Approval for running fork pull request workflows from contributors*, select
+   **Require approval for all external contributors** and save. Or with the GitHub CLI:
+
+   ```sh
+   gh api -X PUT repos/<owner>/<repo>/actions/permissions/fork-pr-contributor-approval \
+     -f approval_policy=all_external_contributors
+   # check: prints "all_external_contributors"
+   gh api repos/<owner>/<repo>/actions/permissions/fork-pr-contributor-approval --jq .approval_policy
+   ```
+
+   Such a workflow then waits until a maintainer clicks *Approve and run*. Review the pull
+   request first, in particular changes under `.github/workflows/`.
 2. Make sure no workflow runs fork pull request code with repository privileges. In particular,
    no `pull_request_target` (or `workflow_run`) workflow may check out the pull request's head
    and run it.

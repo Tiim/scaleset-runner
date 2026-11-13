@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: orpheus
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go vet ./...
+      # No -race: it needs cgo, and the Runner Image has no C compiler.
+      - run: go test ./...
+
+  docker:
+    # Checks the sysbox-isolated Docker daemon inside the Runner Container.
+    runs-on: orpheus
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker info --format '{{.ServerVersion}} {{.DefaultRuntime}}'
+      - run: docker run --rm alpine echo inner-docker-ok
+      - run: docker build -t scaleset-runner:ci .
+
+  publish:
+    # Pushes the controller image to GHCR on pushes to main and on v* tags.
+    # Tag v1.2.3 -> v1.2.3, v1.2, v1, sha-<sha>; main -> sha-<sha>.
+    if: github.event_name == 'push'
+    needs: [test, docker]
+    runs-on: orpheus
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # GHCR image names must be lowercase.
+          images: ghcr.io/tiim/scaleset-runner
+          flavor: latest=false
+          tags: |
+            type=sha,prefix=sha-
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || format('sha-{0}', github.sha) }}
