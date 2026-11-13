@@ -23,19 +23,21 @@ CREATE TABLE IF NOT EXISTS controller (
 CREATE TABLE IF NOT EXISTS scale_set (
 	id                  INTEGER PRIMARY KEY,
 	controller_id       INTEGER NOT NULL REFERENCES controller(id),
-	github_scale_set_id INTEGER NOT NULL UNIQUE,
+	github_scale_set_id INTEGER NOT NULL,
 	repository          TEXT NOT NULL,
 	name                TEXT NOT NULL,
 	origin              TEXT NOT NULL CHECK (origin IN ('Created','TakenOver')),
 	created_at          TEXT NOT NULL,
-	UNIQUE (controller_id, repository, name)
+	UNIQUE (controller_id, repository, name),
+	UNIQUE (repository, github_scale_set_id)
 );
 CREATE TABLE IF NOT EXISTS runner_registration (
 	id               INTEGER PRIMARY KEY,
 	scale_set_id     INTEGER NOT NULL REFERENCES scale_set(id),
-	github_runner_id INTEGER NOT NULL UNIQUE,
+	github_runner_id INTEGER NOT NULL,
 	runner_name      TEXT NOT NULL UNIQUE,
-	created_at       TEXT NOT NULL
+	created_at       TEXT NOT NULL,
+	UNIQUE (scale_set_id, github_runner_id)
 );
 CREATE TABLE IF NOT EXISTS runner_image (
 	id             INTEGER PRIMARY KEY,
@@ -62,6 +64,69 @@ CREATE TABLE IF NOT EXISTS runner_container (
 );
 `
 
+// schemaVersion is stored in PRAGMA user_version.
+const schemaVersion = 1
+
+// migrations[v] upgrades a State Store from user_version v to v+1.
+var migrations = []string{
+	// 0 -> 1: GitHub scopes Scale Set and runner IDs per repository, so they
+	// are unique per repository / Scale Set, not globally.
+	`
+	CREATE TABLE scale_set_new (
+		id                  INTEGER PRIMARY KEY,
+		controller_id       INTEGER NOT NULL REFERENCES controller(id),
+		github_scale_set_id INTEGER NOT NULL,
+		repository          TEXT NOT NULL,
+		name                TEXT NOT NULL,
+		origin              TEXT NOT NULL CHECK (origin IN ('Created','TakenOver')),
+		created_at          TEXT NOT NULL,
+		UNIQUE (controller_id, repository, name),
+		UNIQUE (repository, github_scale_set_id)
+	);
+	INSERT INTO scale_set_new SELECT id, controller_id, github_scale_set_id, repository, name, origin, created_at FROM scale_set;
+	DROP TABLE scale_set;
+	ALTER TABLE scale_set_new RENAME TO scale_set;
+	CREATE TABLE runner_registration_new (
+		id               INTEGER PRIMARY KEY,
+		scale_set_id     INTEGER NOT NULL REFERENCES scale_set(id),
+		github_runner_id INTEGER NOT NULL,
+		runner_name      TEXT NOT NULL UNIQUE,
+		created_at       TEXT NOT NULL,
+		UNIQUE (scale_set_id, github_runner_id)
+	);
+	INSERT INTO runner_registration_new SELECT id, scale_set_id, github_runner_id, runner_name, created_at FROM runner_registration;
+	DROP TABLE runner_registration;
+	ALTER TABLE runner_registration_new RENAME TO runner_registration;
+	`,
+}
+
+// migrate brings an existing State Store up to schemaVersion. A fresh one is
+// created by schema at the latest version and only gets its version stamped.
+func migrate(db *sql.DB, fresh bool) error {
+	var v int
+	if err := db.QueryRow(`PRAGMA user_version`).Scan(&v); err != nil {
+		return err
+	}
+	if fresh {
+		v = schemaVersion
+	}
+	for ; v < schemaVersion; v++ {
+		tx, err := db.Begin()
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(migrations[v]); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("migrate state store to version %d: %w", v+1, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
+	_, err := db.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, schemaVersion))
+	return err
+}
+
 // ErrOtherInstance means the State Store belongs to another Controller.
 var ErrOtherInstance = errors.New("state store belongs to another instance")
 
@@ -85,9 +150,18 @@ func Open(path, instanceID string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 	s := &Store{db: db, now: time.Now}
+	var tables int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'controller'`).Scan(&tables); err != nil {
+		db.Close()
+		return nil, err
+	}
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("create schema: %w", err)
+	}
+	if err := migrate(db, tables == 0); err != nil {
+		db.Close()
+		return nil, err
 	}
 	var id int64
 	var owner string

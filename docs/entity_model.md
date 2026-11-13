@@ -40,7 +40,7 @@ A Scale Set the Controller created or took over on one repository (FR-001, FR-03
 |---------------------|-----------------------------------------------------------------|-----------|------------------|---------------------------------------|
 | id                  | Unique identifier                                               | Long      | 19               | Primary Key, Sequence                 |
 | controller_id       | Controller that serves the Scale Set                            | Long      | 19               | Not Null, Foreign Key (CONTROLLER.id) |
-| github_scale_set_id | ID GitHub assigned to the Scale Set                             | Long      | 19               | Not Null, Unique                      |
+| github_scale_set_id | ID GitHub assigned to the Scale Set                             | Long      | 19               | Not Null                              |
 | repository          | Repository the Scale Set is registered on, as `owner/name`      | String    | 140              | Not Null                              |
 | name                | Scale Set name that workflows target with `runs-on`             | String    | 100              | Not Null                              |
 | origin              | Whether the Controller created the Scale Set or took it over    | String    | 20               | Not Null, Values: Created, TakenOver  |
@@ -49,6 +49,7 @@ A Scale Set the Controller created or took over on one repository (FR-001, FR-03
 #### Constraints
 
 - The combination of controller_id and repository is unique: a Controller serves one Scale Set per repository.
+- The combination of repository and github_scale_set_id is unique: GitHub numbers Scale Sets per repository, so the same ID recurs across repositories.
 - A Scale Set whose repository or name is no longer in the Config is deleted on GitHub and then its row is removed (UC-003); the row stays while the deletion is retried.
 
 ### RUNNER_REGISTRATION
@@ -59,12 +60,13 @@ The ephemeral runner GitHub knows about for one Runner Container, created with a
 |------------------|-----------------------------------------------------------|-----------|------------------|--------------------------------------|
 | id               | Unique identifier                                         | Long      | 19               | Primary Key, Sequence                |
 | scale_set_id     | Scale Set the runner is registered in                     | Long      | 19               | Not Null, Foreign Key (SCALE_SET.id) |
-| github_runner_id | ID GitHub assigned to the runner                          | Long      | 19               | Not Null, Unique                     |
+| github_runner_id | ID GitHub assigned to the runner                          | Long      | 19               | Not Null                             |
 | runner_name      | Runner name sent with the JIT Config request              | String    | 64               | Not Null, Unique                     |
 | created_at       | Time the JIT Config was issued                            | DateTime  | -                | Not Null                             |
 
 #### Constraints
 
+- The combination of scale_set_id and github_runner_id is unique: GitHub numbers runners per repository.
 - A row is removed only after GitHub has deleted the runner; a row whose Runner Container is gone stays so that the next start deletes it (UC-001 step 5, UC-004 A3).
 - A SCALE_SET row is removed only after all its RUNNER_REGISTRATION rows are gone; a stale Scale Set is deleted on GitHub only once its recorded Runner Registrations are deleted (UC-001 BR-010).
 
