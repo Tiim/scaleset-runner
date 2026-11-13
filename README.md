@@ -24,7 +24,10 @@ docker compose up -d --build --wait
 
 On start the Controller:
 
-1. builds the default Runner Image (`scaleset-runner/runner:<instance id>`) if it is missing;
+1. builds the default Runner Image (`scaleset-runner/runner:<instance id>`) if it is missing, or
+   rebuilds it if it was built from another version of the embedded Dockerfile (a new release
+   that changes the image takes effect on the next start; if the rebuild fails, the old image
+   stays in use until the next refresh);
 2. removes Runner Containers and Runner Registrations left from a previous run;
 3. deletes Scale Sets it recorded for repositories or names that are no longer configured;
 4. creates, takes over, or updates one Scale Set per configured repository, then starts polling.
@@ -105,7 +108,8 @@ If you cannot meet these settings, leave the repository out of the Config.
 
 Every Runner Container has its own Docker daemon (sysbox), so `docker build` and
 `docker compose` work without access to the Host's Docker. The default Runner Image adds the
-compose plugin and an SSH client to `ghcr.io/actions/actions-runner`, so remote builds work too:
+compose plugin, an SSH client, a C compiler (`gcc`, so cgo and `go test -race` work) and Node.js
+with npm to `ghcr.io/actions/actions-runner`. Remote builds work too:
 
 ```yaml
 - run: docker --host ssh://deploy@build-host build -t app .

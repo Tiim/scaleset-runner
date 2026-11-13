@@ -260,7 +260,7 @@ func (d *Docker) BuildDefaultImage(ctx context.Context, tag string) (string, err
 		NoCache:     true, // fresh packages on every refresh
 		Remove:      true,
 		ForceRemove: true,
-		Labels:      map[string]string{"scaleset-runner.image": "default"},
+		Labels:      map[string]string{"scaleset-runner.image": "default", assets.RecipeLabel: assets.RunnerRecipe},
 	})
 	if err != nil {
 		return "", err
@@ -271,6 +271,21 @@ func (d *Docker) BuildDefaultImage(ctx context.Context, tag string) (string, err
 	}
 	id, _, err := d.ImageID(ctx, tag)
 	return id, err
+}
+
+func (d *Docker) DefaultImageOutdated(ctx context.Context, tag string) (bool, error) {
+	insp, err := d.cli.ImageInspect(ctx, tag)
+	if errdefs.IsNotFound(err) {
+		return false, controller.ErrNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	var labels map[string]string
+	if insp.Config != nil {
+		labels = insp.Config.Labels
+	}
+	return labels[assets.RecipeLabel] != assets.RunnerRecipe, nil
 }
 
 func (d *Docker) PullImage(ctx context.Context, ref string) (string, error) {

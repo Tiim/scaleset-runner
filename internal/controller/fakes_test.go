@@ -46,6 +46,8 @@ type fakeDocker struct {
 	startedRepos   []string
 	images         map[string]string
 	builds, pulls  int
+	outdated       map[string]bool
+	buildErr       error
 	pullErr        error
 	nextID         int
 }
@@ -159,9 +161,22 @@ func (d *fakeDocker) BuildDefaultImage(_ context.Context, tag string) (string, e
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.builds++
+	if d.buildErr != nil {
+		return "", d.buildErr
+	}
 	id := fmt.Sprintf("sha256:build%d", d.builds)
 	d.images[tag] = id
+	delete(d.outdated, tag)
 	return id, nil
+}
+
+func (d *fakeDocker) DefaultImageOutdated(_ context.Context, tag string) (bool, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if _, ok := d.images[tag]; !ok {
+		return false, ErrNotFound
+	}
+	return d.outdated[tag], nil
 }
 
 func (d *fakeDocker) PullImage(_ context.Context, ref string) (string, error) {

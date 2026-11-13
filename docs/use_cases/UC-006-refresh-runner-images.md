@@ -7,7 +7,7 @@
 **Primary Actor:** Time  
 **Secondary Actors:** Docker Engine  
 **Goal:** Keep every Runner Image recent so that Runner Containers stay within GitHub's runner update window.  
-**Trigger:** The refresh interval has passed since the last refresh, or the Controller starts and a Runner Image is missing (UC-001 Deploy Controller)  
+**Trigger:** The refresh interval has passed since the last refresh, or the Controller starts and a Runner Image is missing or the default Runner Image is outdated (UC-001 Deploy Controller)  
 **Status:** Draft  
 
 **Requirements:** [FR-023, FR-027, FR-030, FR-032, FR-037, C-003](../requirements.md)
@@ -82,6 +82,15 @@
 2. System records for every Runner Image it built or pulled the time of its successful refresh.
 3. Use case ends; UC-001 Deploy Controller continues, and the next refresh of every Runner Image falls due as before.
 
+### A7: Default Runner Image Outdated at Startup
+
+**Trigger:** The Controller starts and the default Runner Image on the Host was built from a different Dockerfile than the one this Controller version ships (step 1)  
+**Flow:**
+
+1. System builds the default Runner Image as in steps 2-3 and records the time of its successful refresh.
+2. If the build fails, System keeps the present default Runner Image, records the failed refresh and retries it daily (BR-002).
+3. Use case ends; UC-001 Deploy Controller continues.
+
 ## Postconditions
 
 ### Success Postconditions
@@ -115,7 +124,11 @@ A Runner Image whose last successful refresh lies more than 49 days back is over
 
 ### BR-004: Default Runner Image Content
 
-The default Runner Image adds the compose plugin and an SSH client to the official actions-runner image, with runner self-update disabled.
+The default Runner Image adds the compose plugin, an SSH client, gcc and Node.js to the official actions-runner image, with runner self-update disabled.
+
+### BR-007: Default Runner Image Version
+
+Every default Runner Image records which version of the shipped Dockerfile it was built from, so that a Controller release that changes the default Runner Image content takes effect when the Controller restarts, without waiting for the refresh interval. A release that leaves the Dockerfile unchanged does not cause a rebuild.
 
 ### BR-005: Entrypoint Supplied by the Controller
 

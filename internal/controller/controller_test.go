@@ -470,6 +470,49 @@ func TestMissingDefaultImageIsBuilt(t *testing.T) {
 	}
 }
 
+// A default image built from another Dockerfile (older Controller version) is
+// rebuilt at startup.
+func TestOutdatedDefaultImageIsRebuilt(t *testing.T) {
+	h := newHarness(t, testConfig(1), func(h *harness) {
+		h.docker.outdated = map[string]bool{"scaleset-runner/runner:test": true}
+	})
+	h.start()
+	eventually(t, "healthy", h.healthy)
+	h.docker.mu.Lock()
+	defer h.docker.mu.Unlock()
+	if h.docker.builds != 1 || h.docker.images["scaleset-runner/runner:test"] != "sha256:build1" {
+		t.Fatalf("builds=%d image=%s", h.docker.builds, h.docker.images["scaleset-runner/runner:test"])
+	}
+}
+
+// A current default image is not rebuilt at startup.
+func TestCurrentDefaultImageIsKept(t *testing.T) {
+	h := newHarness(t, testConfig(1), nil)
+	h.start()
+	eventually(t, "healthy", h.healthy)
+	h.docker.mu.Lock()
+	defer h.docker.mu.Unlock()
+	if h.docker.builds != 0 {
+		t.Fatalf("builds=%d", h.docker.builds)
+	}
+}
+
+// If rebuilding an outdated default image fails, the Controller keeps
+// serving with the old one.
+func TestOutdatedDefaultImageRebuildFailureKeepsOld(t *testing.T) {
+	h := newHarness(t, testConfig(1), func(h *harness) {
+		h.docker.outdated = map[string]bool{"scaleset-runner/runner:test": true}
+		h.docker.buildErr = errors.New("network down")
+	})
+	h.start()
+	eventually(t, "healthy", h.healthy)
+	h.docker.mu.Lock()
+	defer h.docker.mu.Unlock()
+	if h.docker.images["scaleset-runner/runner:test"] != "sha256:default1" {
+		t.Fatalf("image=%s", h.docker.images["scaleset-runner/runner:test"])
+	}
+}
+
 func TestMetrics(t *testing.T) {
 	h := newHarness(t, testConfig(1), nil)
 	h.start()

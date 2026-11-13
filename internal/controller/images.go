@@ -37,6 +37,20 @@ func (c *Controller) imageKind(ref string) string {
 func (c *Controller) ensureImages(ctx context.Context) error {
 	for ref, im := range c.images {
 		id, created, err := c.docker.ImageID(ctx, ref)
+		if err == nil && im.kind == store.KindDefault {
+			if outdated, oerr := c.docker.DefaultImageOutdated(ctx, ref); oerr != nil {
+				c.log.Warn("checking the default runner image version failed; keeping it", "image", ref, "error", oerr)
+			} else if outdated {
+				c.log.Info("default runner image was built by another controller version; rebuilding it", "image", ref)
+				if rerr := c.refreshImage(ctx, im); rerr != nil {
+					// The old image still works: keep it, retry on the next refresh.
+					c.log.Error("rebuilding the default runner image failed; keeping the current one", "image", ref, "error", rerr)
+				} else {
+					c.markAvailable(im)
+					continue
+				}
+			}
+		}
 		switch {
 		case err == nil:
 			row, serr := c.st.CurrentImage(ref)

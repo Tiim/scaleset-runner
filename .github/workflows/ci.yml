@@ -22,8 +22,7 @@ jobs:
           cache: true
 
       - run: go vet ./...
-      # No -race: it needs cgo, and the Runner Image has no C compiler.
-      - run: go test ./...
+      - run: go test -race ./...
 
   docker:
     # Checks the sysbox-isolated Docker daemon inside the Runner Container.

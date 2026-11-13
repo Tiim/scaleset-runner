@@ -21,7 +21,7 @@
 | Ready marker        | The line the Controller-supplied entrypoint writes to the Runner Container's output once the inner Docker daemon accepts commands and the runner has connected to GitHub. |                            |
 | Readiness timeout   | The time a Runner Container may take to write the Ready marker before the Controller treats it as failed to start; 120 seconds by default, configurable. |                            |
 | Growing delays      | Retry delays that start at 1 second, double with each failed attempt, vary randomly by up to 20%, and stop growing at 5 minutes.     | Backoff                    |
-| Runner Image        | The container image Runner Containers start from: by default built on the Host from the official actions-runner image plus the compose plugin and an SSH client; the Controller supplies its entrypoint.|                            |
+| Runner Image        | The container image Runner Containers start from: by default built on the Host from the official actions-runner image plus the compose plugin, an SSH client, gcc and Node.js; the Controller supplies its entrypoint.|                            |
 | Refresh interval    | The number of days between two refreshes of the Runner Images; 7 by default, configurable.                                          |                            |
 | JIT Config          | The one-time runner configuration GitHub issues for one Runner Container; a secret until consumed.                                  | Registration token         |
 | Slot                | One unit of a Controller's limit on Runner Containers that may run at the same time across all its Scale Sets.                      |                            |

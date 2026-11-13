@@ -57,6 +57,9 @@ type Docker interface {
 	ImageID(ctx context.Context, ref string) (string, time.Time, error)
 	// BuildDefaultImage builds the default Runner Image as tag from the newest base image.
 	BuildDefaultImage(ctx context.Context, tag string) (string, error)
+	// DefaultImageOutdated reports whether the default Runner Image tag was
+	// built from another Dockerfile than this Controller version ships.
+	DefaultImageOutdated(ctx context.Context, tag string) (bool, error)
 	PullImage(ctx context.Context, ref string) (string, error)
 	// RemoveImage removes an image by ID without force, so an image another
 	// container or tag still uses stays.
